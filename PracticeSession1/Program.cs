@@ -31,7 +31,7 @@ public class Program
         do
         {
             Console.WriteLine($"Enter start number:");
-            string v1 = Console.ReadLine();
+            var v1 = Console.ReadLine();
 
             while (!Int32.TryParse(v1, out startRange))
             {
@@ -41,7 +41,7 @@ public class Program
             }
 
             Console.WriteLine($"Enter end number:");
-            string v2 = Console.ReadLine();
+            var v2 = Console.ReadLine();
 
             while (!Int32.TryParse(v2, out endRange))
             {

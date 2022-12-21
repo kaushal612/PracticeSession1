@@ -1,4 +1,5 @@
 ﻿// See https://aka.ms/new-console-template for more information
+using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.Runtime.Intrinsics.X86;
@@ -33,6 +34,9 @@ public class MigrationUtility
         get;
         private set;
     }
+    const int READDATASIZE = 1000;
+    const int BATCHSIZE = 100;
+
 
     public MigrationUtility(int startRange, int endRange)
     {
@@ -55,17 +59,22 @@ public class MigrationUtility
         while (start <= end)
         {
             var sourceData = getDataFromSourceTable(start, end);
-            ExecuteBatch(sourceData);
+        
+            int NoOfBatch = (int)Math.Ceiling((double)sourceData.Count / BATCHSIZE);
 
-            //int NoOfBatch = (int)Math.Ceiling((double)(sourceData.Count / 100));
-            //for(int i = 1; i<=NoOfBatch; i++)
-            //{
-            //    Dictionary<int, (int , int)> BatchData= (Dictionary<int, (int, int)>)sourceData.Take(100);
-            //    ExecuteBatch(BatchData);
-            //    sourceData= (Dictionary<int, (int, int)>)sourceData.Skip(100);
-            //}
+            for (int i = 1; i <= NoOfBatch; i++)
+            {
 
-            start += 100;
+                //taking first BATCHSIZE data for processing
+                Dictionary< int, (int, int) > batchData = sourceData.Take(BATCHSIZE).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+              
+                ExecuteBatch(batchData);
+
+                //removing first BATCHSIZE processed data from sourcedata 
+                sourceData = sourceData.Skip(BATCHSIZE).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            }
+
+            start += READDATASIZE;
         }
 
         MigrationCompletedFlag = true;
@@ -113,7 +122,7 @@ public class MigrationUtility
         Dictionary<int, (int, int)> sourceData = new Dictionary<int, (int, int)>();
         
 
-        int limit = Math.Min(100, end - start + 1);
+        int limit = Math.Min(READDATASIZE, end - start + 1);
         String query = "SELECT * FROM Sourcetable ORDER BY ID OFFSET " + (start - 1) + " ROWS FETCH NEXT " + limit + " ROWS ONLY;";
         
         SqlCommand command = new SqlCommand();
@@ -135,6 +144,8 @@ public class MigrationUtility
             }
         }
         Conn.Close();
+       
+        Console.WriteLine($"\n{sourceData.Count} Data successffuly retrived from SourceTable \n");
         return sourceData;
     }
 
@@ -188,59 +199,5 @@ public class MigrationUtility
         {
             Conn.Close();
         }
-
     }
-
-    //void StartMigration(Dictionary<int, (int, int)> result)
-    //{
-    //    Dictionary<int, (int, int)> d1 = new Dictionary<int, (int, int)>();
-
-    //    int cnt = 0;
-    //    foreach (var row in result)
-    //    {
-    //        cnt++;
-    //        d1[row.Key] = (row.Value.Item1, row.Value.Item2);
-    //        if (cnt == 100)
-    //        {
-    //            ExecuteBatch(d1);
-
-    //          //  Console.WriteLine("----------------------------------------");
-    //            //Console.WriteLine($"100 data batch is completed");
-    //            //Console.WriteLine("----------------------------------------");
-
-    //            d1.Clear();
-    //            cnt = 0;
-    //        }
-    //    }
-    //    if (cnt != 0)
-    //    {
-    //        ExecuteBatch(d1);
-    //    }
-    //}
-
-    //void MigrateRecord(int id, int n1, int n2)
-    //{
-    //    String query = "insert into DestinationTable(SourceID, Sum) values(@SourceID,@Sum)";
-
-    //    SqlCommand command = new SqlCommand();
-
-    //    command.Parameters.AddWithValue("@SourceID", id);
-    //    command.Parameters.AddWithValue("@Sum", n1 + n2);
-    //    command.CommandType = CommandType.Text;
-    //    command.CommandText = query;
-    //    command.Connection = Conn;
-
-    //    try
-    //    {
-    //        command.ExecuteNonQuery();
-    //        //count++;
-    //        Console.WriteLine($"   sourceId {id} with sum {n1 + n2} added");
-    //    }
-    //    catch (Exception ex)
-    //    {
-    //        Console.WriteLine(ex.ToString());
-    //    }
-
-    //    Thread.Sleep(500);
-    //}
 }
