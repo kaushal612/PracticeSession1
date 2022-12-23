@@ -34,16 +34,23 @@ public class MigrationUtility
         get;
         private set;
     }
+    public bool RequestToCancel
+    {
+        get;
+        set;
+    }
+
     const int READDATASIZE = 1000;
     const int BATCHSIZE = 100;
 
 
     public MigrationUtility(int startRange, int endRange)
     {
-        this.StartRange = startRange;
-        this.EndRange = endRange;
+        StartRange = startRange;
+        EndRange = endRange;
         CompletedCount = 0;
         MigrationCompletedFlag = false;
+        RequestToCancel = false;
 
         Conn = new SqlConnection();
         Conn.ConnectionString = "Data Source=(LocalDB)\\MSSQLLocalDB;Initial Catalog=MyDb;Integrated Security=True";
@@ -58,19 +65,21 @@ public class MigrationUtility
 
         while (start <= end)
         {
-            var sourceData = getDataFromSourceTable(start, end);
-        
-            int NoOfBatch = (int)Math.Ceiling((double)sourceData.Count / BATCHSIZE);
+            Dictionary<int, (int, int)> sourceData = getDataFromSourceTable(start, end);
 
-            for (int i = 1; i <= NoOfBatch; i++)
+            int NoOfBatches = (int)Math.Ceiling((double)sourceData.Count / BATCHSIZE);
+
+            for (int i = 1; i <= NoOfBatches; i++)
             {
+                if (RequestToCancel == true)
+                    return;
 
                 //taking first BATCHSIZE data for processing
-                Dictionary< int, (int, int) > batchData = sourceData.Take(BATCHSIZE).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
-              
+                Dictionary<int, (int, int)> batchData = sourceData.Take(BATCHSIZE).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+
                 ExecuteBatch(batchData);
 
-                //removing first BATCHSIZE processed data from sourcedata 
+                //removing first BATCHSIZE processed data from sourcedata  
                 sourceData = sourceData.Skip(BATCHSIZE).ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
             }
 
@@ -120,11 +129,10 @@ public class MigrationUtility
     Dictionary<int, (int, int)> getDataFromSourceTable(int start, int end)
     {
         Dictionary<int, (int, int)> sourceData = new Dictionary<int, (int, int)>();
-        
 
         int limit = Math.Min(READDATASIZE, end - start + 1);
         String query = "SELECT * FROM Sourcetable ORDER BY ID OFFSET " + (start - 1) + " ROWS FETCH NEXT " + limit + " ROWS ONLY;";
-        
+
         SqlCommand command = new SqlCommand();
         command.CommandType = CommandType.Text;
         command.CommandText = query;
@@ -144,12 +152,12 @@ public class MigrationUtility
             }
         }
         Conn.Close();
-       
-        Console.WriteLine($"\n{sourceData.Count} Data successffuly retrived from SourceTable \n");
+
+        Console.WriteLine($"\n{sourceData.Count} Data Successffuly Retrived from SourceTable \n");
         return sourceData;
     }
 
-    
+
 
     private void ExecuteBatch(Dictionary<int, (int FirstNumber, int SecondNumber)> SourceData)
     {
@@ -163,13 +171,11 @@ public class MigrationUtility
             int n1 = Data.Value.FirstNumber;
             int n2 = Data.Value.SecondNumber;
 
-            //   Console.WriteLine($"{id} --> {n1}, {n2}");
             DataRow dr = tbl.NewRow();
             dr["SourceID"] = id;
             dr["Sum"] = n1 + n2;
 
             tbl.Rows.Add(dr);
-            //MigrateRecord(id, n1, n2);
         }
         SqlBulkCopy objbulk = new SqlBulkCopy(Conn);
 
@@ -199,5 +205,6 @@ public class MigrationUtility
         {
             Conn.Close();
         }
+
     }
 }

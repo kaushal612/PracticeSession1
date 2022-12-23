@@ -9,20 +9,31 @@ public class Program
     public static void Main(string[] args)
     {
         Console.WriteLine("Hello, Welcome to the Data Migration Utility Apllication");
-        //MyMigration Mg1 = new MyMigration();
-        int startRange, endRange;
 
-        ReadRangeInput(out startRange, out endRange);
+        string CheckCondition = "YES";
 
-        MigrationUtility mg1 = new MigrationUtility(startRange, endRange);
+        while (CheckCondition.ToUpper() == "YES")
+        {
+            int startRange, endRange;
 
-        Thread backgroundThread = new Thread(mg1.MigrationTask);
-        backgroundThread.IsBackground = true;
-        backgroundThread.Start();
+            //Read startRange and endRange
+            ReadRangeInput(out startRange, out endRange);
 
-        CheckingUserActivity(startRange, endRange, mg1);
+            MigrationUtility mg1 = new MigrationUtility(startRange, endRange);
 
-        mg1.Conn.Close();
+            Thread MigrationThread = new Thread(mg1.MigrationTask);
+            MigrationThread.IsBackground = true;
+            MigrationThread.Start();
+
+            CheckingUserActivity(mg1);
+
+            MigrationThread.Join();
+
+            mg1.Conn.Close();
+
+            Console.WriteLine("If you want to Migrate other data then Enter - YES");
+            CheckCondition = Console.ReadLine().ToString();
+        }
     }
 
     private static void ReadRangeInput(out int startRange, out int endRange)
@@ -36,7 +47,6 @@ public class Program
             while (!Int32.TryParse(v1, out startRange))
             {
                 Console.WriteLine("Not a valid number, try again.");
-
                 v1 = Console.ReadLine();
             }
 
@@ -46,46 +56,47 @@ public class Program
             while (!Int32.TryParse(v2, out endRange))
             {
                 Console.WriteLine("Not a valid number, try again.");
-
                 v2 = Console.ReadLine();
             }
 
-            if (startRange < endRange && startRange > 0 && endRange <= 1000000)
+            if (startRange < endRange && startRange >= 1 && endRange <= 1000000)
             {
                 break;
             }
 
-            Console.WriteLine($"invalid Range");
+            Console.WriteLine($"Invalid Range");
             Console.WriteLine($"Enter Range again");
 
         } while (true);
     }
 
-    private static void CheckingUserActivity(int startRange, int endRange, MigrationUtility mg1)
+    private static void CheckingUserActivity(MigrationUtility mg1)
     {
         while (true)
         {
             string input = Console.ReadLine().ToString();
 
-            if (input.ToUpper() == "STATUS")
+            if (input.ToUpper() == "CANCEL")
             {
-                Console.WriteLine("\n\n---------------------------------------*****  STATUS  *****--------------------------------------");
+                mg1.RequestToCancel = true;
+                Console.WriteLine("\n\n-------------------------------------*****   MIGRATION CANCELED  *****--------------------------------------");
+                Console.WriteLine($"{mg1.CompletedCount} Records Migration completed ");
+                Console.WriteLine($"{mg1.EndRange - mg1.StartRange - mg1.CompletedCount + 1} Records Migration Canceled ");
+                Console.WriteLine("--------------------------------------------------------------------------------------------------\n\n");
+
+                break;
+            }
+            else if (input.ToUpper() == "STATUS")
+            {
+                Console.WriteLine("\n\n---------------------------------------*****  MIGRATION STATUS  *****--------------------------------------");
                 Console.WriteLine($"{mg1.CompletedCount} Records Migration completed ");
                 Console.WriteLine($"{mg1.EndRange - mg1.StartRange - (mg1.CompletedCount) + 1} Records Migration Ongoing ");
                 Console.WriteLine("-------------------------------------------------------------------------------------------------\n\n");
             }
-            else if (input.ToUpper() == "CANCEL")
-            {
-                Console.WriteLine("\n\n-------------------------------------*****   CANCELED  *****--------------------------------------");
-                Console.WriteLine($"{mg1.CompletedCount} Records Migration completed ");
-                Console.WriteLine($"{mg1.EndRange - mg1.StartRange - mg1.CompletedCount + 1} Records Migration Canceled ");
-                Console.WriteLine("--------------------------------------------------------------------------------------------------\n\n");
-                break;
-            }
             else if (mg1.MigrationCompletedFlag == true)
             {
-                Console.WriteLine("Successfully Data Migrated");
-                Console.WriteLine("\n\n-------------------------------------*****   COMPLETED  *****-------------------------------------");
+                Console.WriteLine("\n\nSuccessfully Data Migrated");
+                Console.WriteLine("\n-------------------------------------*****  MIGRATION COMPLETED  *****-------------------------------------");
                 Console.WriteLine($"{mg1.CompletedCount} Records Migration completed ");
                 Console.WriteLine($"{mg1.EndRange - mg1.StartRange - mg1.CompletedCount + 1} Records Migration Remaining ");
                 Console.WriteLine("--------------------------------------------------------------------------------------------------\n\n");
